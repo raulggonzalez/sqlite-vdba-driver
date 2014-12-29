@@ -1,3 +1,4 @@
 # external libraries
+test/data/db/*
 test/vendor/
 node_modules/
