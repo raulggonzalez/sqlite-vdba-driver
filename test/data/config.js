@@ -18,6 +18,11 @@ exports.database = {
       userId: {type: "serial", pk: true},
       username: {type: "text", unique: true, nullable: false},
       password: {type: "text", nullable: false}
+    },
+    index: {
+      name: "ix_user_username",
+      columns: "username",
+      options: {ifNotExists: true}
     }
   },
 
