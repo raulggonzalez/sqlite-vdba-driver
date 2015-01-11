@@ -82,11 +82,33 @@
 	// While Michael have found these options in [example1][2] and [example2][3] (already gone 404)
 	// they are not described in the [JSHint Options documentation][4].
 
-	"predef" : [ // Extra globals.
-		//"exampleVar",
-		//"anotherCoolGlobal",
-		//"iLoveDouglas"
-		//"Java", "JavaFX", "$ARG" //no effect
+	"predef" : [
+	  "Adapter",
+	  "Converter",
+	  "DataDefinitionEngine",
+	  "Filter",
+	  "InsertEngine",
+	  "qn",
+	  "RemoveEngine",
+	  "SelectEngine",
+	  "SPEC_TYPE",
+	  "SQLEngine",
+	  "SQLFilterFormatter",
+	  "sqlite",
+	  "SQLiteColumn",
+	  "SQLiteConnection",
+	  "SQLiteDatabase",
+	  "SQLiteDriver",
+	  "SQLiteIndex",
+	  "SQLiteQuery",
+	  "SQLiteResult",
+	  "SQLiteSchema",
+	  "SQLiteServer",
+	  "SQLiteTable",
+	  "sqlQN",
+	  "UpdateEngine",
+	  "util",
+	  "vdba"
 	]
 	//,	"indent" : 2 // Specify indentation spacing
 }

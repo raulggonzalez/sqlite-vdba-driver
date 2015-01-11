@@ -1,2 +1,3 @@
-global.vdba = require("../lib/index");
-global.config = require("./data/config");
+global.SPEC_TYPE = 2;
+global.vdba = require("../build/sqlite-vdba-driver");
+global.config = require("./config");

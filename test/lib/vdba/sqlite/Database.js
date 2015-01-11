@@ -34,15 +34,15 @@ describe("vdba.sqlite.SQLiteDatabase", function() {
     });
 
     describe("Error handling", function() {
-      it("createTable(name)", function() {
+      it("createTable(schema, name)", function() {
         (function() {
-          db.createTable(user.name);
+          db.createTable(user.schema, user.name);
         }).should.throwError("Table columns expected.");
       });
 
-      it("createTable(name, {})", function() {
+      it("createTable(schema, name, {})", function() {
         (function() {
-          db.createTable(user.name, {});
+          db.createTable(user.schema, user.name, {});
         }).should.throwError("Table columns expected.");
       });
     });

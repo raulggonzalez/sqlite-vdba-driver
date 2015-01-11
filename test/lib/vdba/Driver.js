@@ -10,18 +10,18 @@ describe("vdba.Driver", function() {
       it("createConnection({})", function() {
         (function() {
           drv.createConnection({});
-        }).should.throwError("Database file expected.");
+        }).should.throwError("Database expected.");
       });
 
-      it("createConnection({file: undefined})", function() {
+      it("createConnection({database: undefined})", function() {
         (function() {
-          drv.createConnection({file: undefined});
-        }).should.throwError("Database file expected.");
+          drv.createConnection({database: undefined});
+        }).should.throwError("Database expected.");
       });
 
-      it("createConnection({file: 'file.db', mode: 'unknown'})", function() {
+      it("createConnection({database: 'file.db', mode: 'unknown'})", function() {
         (function() {
-          drv.createConnection({file: config.connection.config.file, mode: "unknown"});
+          drv.createConnection({database: config.connection.config.database, mode: "unknown"});
         }).should.throwError("Unknown open mode: unknown.");
       });
     });

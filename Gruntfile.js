@@ -13,23 +13,29 @@ module.exports = function(grunt) {
       },
 
       test: {
-        src: ["test/data/db/vdba.db"]
+        src: ["test/data/vdba.db"]
       }
     },
 
     concat: {
-      options: {
-        separator: "\n\n"
-      },
-
-      node: {
+      driver: {
         options: {
-          banner: "/*! <%= pkg.name %> - <%= pkg.version %> (<%= grunt.template.today('yyyy-mm-dd') %>) */\n\n(function() {",
+          banner: "(function() {\n\n",
           footer: "\n\n})();"
         },
 
-        src: ["lib/**"],
-        dest: "sqlite-vdba-driver.js"
+        src: ["build/sqlite-api.js", "lib/**"],
+        dest: "build/node-vdba-sqlite.js"
+      },
+
+      build: {
+        options: {
+          banner: "/*! <%= pkg.name %> - <%= pkg.version %> (<%= grunt.template.today('yyyy-mm-dd') %>) */\n",
+          separator: "\n\n"
+        },
+
+        src: ["build/node-vdba-core.js", "build/node-vdba-sqlite.js"],
+        dest: "build/sqlite-vdba-driver.js"
       }
     },
 
@@ -47,11 +53,18 @@ module.exports = function(grunt) {
       }
     },
 
+    copy: {
+      "node-vdba-core.js": {
+        src: "../vdba-core/build/node-vdba-core.js",
+        dest: "build/node-vdba-core.js"
+      }
+    },
+
     jsdoc: {
       "api.html": {
-        src: ["sqlite-vdba-driver.js"],
+        src: ["build/sqlite-vdba-driver.js"],
         options: {
-          recurse: true,
+          recurse: false,
           template: "templates/default",
           destination: "doc/api",
           "private": false
@@ -76,27 +89,28 @@ module.exports = function(grunt) {
         }
       },
 
-      node: {
+      "sqlite-vdba-driver.js": {
         options: {
           jshintrc: true
         },
 
         files: {
-          src: ["sqlite-vdba-driver.js"]
+          src: ["build/sqlite-vdba-driver.js"]
         }
       },
 
       test: {
         options: {
           ignores: [
-            "test/data/db/**",
+            "test/data/**",
             "test/mocha.opts",
-            "test/vendor/**"
+            "test/vendor/**",
+            "../vdba-driver-validator/test/mocha.opts"
           ]
         },
 
         files: {
-          src: ["test/**"]
+          src: ["test/**", "../vdba-driver-validator/test/**"]
         }
       }
     },
@@ -105,7 +119,7 @@ module.exports = function(grunt) {
       options: {
         ignoreLeaks: false,
         quiet: false,
-        reporter: "spec",
+        reporter: "dot",
         require: ["should", function() { util = require("util"); }]
       },
 
@@ -148,6 +162,7 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks("grunt-contrib-clean");
   grunt.loadNpmTasks("grunt-contrib-compress");
   grunt.loadNpmTasks("grunt-contrib-concat");
+  grunt.loadNpmTasks("grunt-contrib-copy");
   grunt.loadNpmTasks("grunt-contrib-jshint");
   grunt.loadNpmTasks("grunt-contrib-uglify");
   grunt.loadNpmTasks("grunt-jsdoc");
@@ -155,8 +170,25 @@ module.exports = function(grunt) {
 
   //(3) define tasks
   grunt.registerTask("testSpecific", "Specific unit testing", [
+    "jshint:lib",
+    "jshint:test",
+    "copy:node-vdba-core.js",
+    "concat:driver",
+    "concat:build",
+    //"jshint:sqlite-vdba-driver.js",
     "clean:test",
     "mochaTest:specific"
+  ]);
+
+  grunt.registerTask("testCommon", "Common unit testing", [
+    "jshint:lib",
+    "jshint:test",
+    "copy:node-vdba-core.js",
+    "concat:driver",
+    "concat:build",
+    //"jshint:sqlite-vdba-driver.js",
+    "clean:test",
+    "mochaTest:common"
   ]);
 
   grunt.registerTask("api.html.zip", "Generates the API doc.", [
@@ -170,10 +202,13 @@ module.exports = function(grunt) {
     "jshint:grunt",
     "jshint:test",
     "jshint:lib",
-    //"concat:node",
+    "copy:node-vdba-core.js",
+    "concat:driver",
+    "concat:build",
+    //"jshint:sqlite-vdba-driver.js",
     //"uglify:node",
-    //"api.html.zip",
-    "mochaTest"
+    "mochaTest",
+    "api.html.zip"
   ]);
 };
 
