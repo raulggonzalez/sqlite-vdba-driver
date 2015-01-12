@@ -1532,9 +1532,9 @@ SQLFilterFormatter.prototype.formatOp = function formatOp(op, col, val, params) 
   else if (op == "$in") res = this.$in(col, val, params);
   else if (op == "$notIn") res = this.$notIn(col, val, params);
   else if (op == "$nin") res = this.$notIn(col, val, params);
-  else if (op == "$contain") res = this.$contain(col, val, params);
-  else if (op == "$notContain") res = this.$notContain(col, val, params);
-  else if (op == "$ncontain") res = this.$notContain(col, val, params);
+  else if (op == "$contains") res = this.$contains(col, val, params);
+  else if (op == "$notContains") res = this.$notContains(col, val, params);
+  else if (op == "$ncontains") res = this.$notContains(col, val, params);
   else throw new Error("Unknown operator: " + op + ".");
 
   //(2) return
@@ -1656,6 +1656,40 @@ SQLFilterFormatter.prototype.$notIn = function $notIn(col, vals, params) {
   }
 
   expr += ")";
+
+  //(2) return
+  return expr;
+};
+
+/**
+ * @private
+ */
+SQLFilterFormatter.prototype.$contains = function $contains(col, val, params) {
+  var expr;
+
+  //(1) format
+  if (typeof(val) == "string") {
+    expr = util.format("instr(%s, '%s') > 0", col, JSON.stringify(val));
+  } else {
+    expr = util.format("instr(%s, '[%d]') > 0 or instr(%s, '[%d,') > 0 or instr(%s, ',%d,') > 0 or instr(%s, ',%d]') > 0", col, val, col, val, col, val, col, val);
+  }
+
+  //(2) return
+  return expr;
+};
+
+/**
+ * @private
+ */
+SQLFilterFormatter.prototype.$notContains = function $notContains(col, val, params) {
+  var expr;
+
+  //(1) format
+  if (typeof(val) == "string") {
+    expr = util.format("%s is null or instr(%s, '%s') = 0", col, col, JSON.stringify(val));
+  } else {
+    expr = util.format("%s is null or (instr(%s, '[%d]') = 0 and instr(%s, '[%d,') = 0 and instr(%s, ',%d,') = 0 and instr(%s, ',%d]') = 0)", col, col, val, col, val, col, val, col, val);
+  }
 
   //(2) return
   return expr;
@@ -2241,12 +2275,114 @@ function buildColumnUpdate(col, val, params) {
     sql = buildSetOfIntegersUpdate(col, val, params);
   } else if (col.isSetOfTexts()) {
     sql = buildSetOfTextsUpdate(col, val, params);
+  } else if (col.isInteger()) {
+    sql = buildIntegerUpdate(col, val, params);
+  } else if (col.isReal()) {
+    sql = buildRealUpdate(col, val, params);
+  } else if (col.isText()) {
+    sql = buildTextUpdate(col, val, params);
   } else {
     sql = col.name + " = ?";
     params.push(val);
   }
 
   return sql;
+}
+
+function buildIntegerUpdate(col, val, params) {
+  var sql, op;
+
+  //(1) determine op
+  if (val === undefined || val === null) {
+    op = "$set";
+    val = null;
+  } else if (typeof(val) != "object") {
+    op = "$set";
+    val = parseInt(val);
+  } else {
+    op = Object.keys(val)[0];
+    val = val[op];
+  }
+
+  //(2) build sql
+  if (op == "$set") {
+    sql = util.format("%s = ?", col.name);
+    params.push(val);
+  } else if (op == "$inc" || op == "$add") {
+    sql = util.format("%s = %s + ?", col.name, col.name);
+    params.push(val);
+  } else if (op == "$dec") {
+    sql = util.format("%s = %s - ?", col.name, col.name);
+    params.push(val);
+  } else if (op == "$mul") {
+    sql = util.format("%s = cast(%s * ? as integer)", col.name, col.name);
+    params.push(val);
+  }
+
+  //(3) return
+  return sql;
+}
+
+function buildRealUpdate(col, val, params) {
+  var sql, op;
+
+  //(1) determine op
+  if (val === undefined || val === null) {
+    op = "$set";
+    val = null;
+  } else if (typeof(val) != "object") {
+    op = "$set";
+    val = parseFloat(val);
+  } else {
+    op = Object.keys(val)[0];
+    val = val[op];
+  }
+
+  //(2) build sql
+  if (op == "$set") {
+    sql = util.format("%s = ?", col.name);
+    params.push(val);
+  } else if (op == "$inc" || op == "$add") {
+    sql = util.format("%s = %s + ?", col.name, col.name);
+    params.push(val);
+  } else if (op == "$dec") {
+    sql = util.format("%s = %s - ?", col.name, col.name);
+    params.push(val);
+  } else if (op == "$mul") {
+    sql = util.format("%s = cast(%s * ? as real)", col.name, col.name);
+    params.push(val);
+  }
+
+  //(3) return
+  return sql;
+}
+
+function buildTextUpdate(col, val, params) {
+ var sql, op;
+
+ //(1) determine op
+ if (val === undefined || val === null) {
+   op = "$set";
+   val = null;
+ } else if (typeof(val) != "object") {
+   op = "$set";
+   val = val.toString();
+ } else {
+   op = Object.keys(val)[0];
+   val = val[op];
+ }
+
+ //(2) build sql
+ if (op == "$set") {
+   sql = util.format("%s = ?", col.name);
+   params.push(val);
+ } else if (op == "$add") {
+   sql = util.format("%s = %s || ?", col.name, col.name);
+   params.push(val);
+ }
+
+ //(3) return
+ return sql;
 }
 
 function buildSetOfIntegersUpdate(col, val, params) {
@@ -2284,7 +2420,7 @@ function buildSetOfIntegersUpdate(col, val, params) {
       col.name, val, col.name, val, col.name, val, col.name,
       col.name, col.name, val
     );
-  } else if (op == "$remove") {
+  } else if (op == "$del") {
     if (val === undefined) val = null;
 
     sql = util.format(
@@ -2347,7 +2483,7 @@ function buildSetOfTextsUpdate(col, val, params) {
       col.name, val, col.name, val, col.name, val, col.name,
       col.name, col.name, val
     );
-  } else if (op == "$remove") {
+  } else if (op == "$del") {
     if (val === undefined) val = null;
 
     sql = util.format(

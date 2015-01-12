@@ -1,4 +1,4 @@
-/*! vdba-core - 0.11.1 (2015-01-11) */
+/*! vdba-core - 0.11.2 (2015-01-12) */
 
 (function() {
 
@@ -291,6 +291,58 @@ Column.prototype.isTime = function isTime() {
  */
 Column.prototype.isDateTime = function isDateTime() {
   return this.type == "datetime";
+};
+
+/**
+ * Checks whether the column stores a number.
+ *
+ * @name isNumber
+ * @function
+ * @memberof vdba.Colummn#
+ *
+ * @returns {Boolean}
+ */
+Column.prototype.isNumber = function isNumber() {
+  return this.type == "integer" || this.type == "real";
+};
+
+/**
+ * Checks whether the column stores a number.
+ *
+ * @name isInteger
+ * @function
+ * @memberof vdba.Column#
+ *
+ * @returns {Boolean}
+ */
+Column.prototype.isInteger = function isInteger() {
+  return this.type == "integer";
+};
+
+/**
+ * Checks whether the column stores a real.
+ *
+ * @name isReal
+ * @function
+ * @memberof vdba.Column#
+ *
+ * @returns {Boolean}
+ */
+Column.prototype.isReal = function isReal() {
+  return this.type == "real";
+};
+
+/**
+ * Checks whether the column stores a text.
+ *
+ * @name isText
+ * @function
+ * @memberof vdba.Column#
+ *
+ * @returns {Boolean}
+ */
+Column.prototype.isText = function isText() {
+  return this.type == "text";
 };
 
 /**

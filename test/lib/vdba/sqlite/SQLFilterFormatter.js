@@ -1,4 +1,3 @@
-
 describe("vdba.sqlite.SQLFilterFormatter", function() {
   var formatter, params;
 
@@ -130,6 +129,26 @@ describe("vdba.sqlite.SQLFilterFormatter", function() {
     });
   });
 
+  describe("#$contains()", function() {
+    it("$contains(col, integer, params)", function() {
+      formatter.$contains("i", 123, params).should.be.eql("instr(i, '[123]') > 0 or instr(i, '[123,') > 0 or instr(i, ',123,') > 0 or instr(i, ',123]') > 0");
+    });
+
+    it("$contains(col, text, params)", function() {
+      formatter.$contains("txt", "bonjour", params).should.be.eql("instr(txt, '\"bonjour\"') > 0");
+    });
+  });
+
+  describe("#$notContains()", function() {
+    it("$notContains(col, integer, params)", function() {
+      formatter.$notContains("i", 123, params).should.be.eql("i is null or (instr(i, '[123]') = 0 and instr(i, '[123,') = 0 and instr(i, ',123,') = 0 and instr(i, ',123]') = 0)");
+    });
+
+    it("$notContains(col, text, params)", function() {
+      formatter.$notContains("txt", "bonjour", params).should.be.eql("txt is null or instr(txt, '\"bonjour\"') = 0");
+    });
+  });
+
   describe("#format()", function() {
     describe("Simple", function() {
       it("format({col: value})", function() {
@@ -177,6 +196,11 @@ describe("vdba.sqlite.SQLFilterFormatter", function() {
         res.should.be.eql({expression: "(name not like ?)", parameters: ["%elvis%"]});
       });
 
+      it("format({col: {$nlike: value}})", function() {
+        var res = formatter.format({name: {$nlike: "%elvis%"}});
+        res.should.be.eql({expression: "(name not like ?)", parameters: ["%elvis%"]});
+      });
+
       it("format({col: {$in: value}})", function() {
         var res = formatter.format({name: {$in: ["elvis", "costello"]}});
         res.should.be.eql({expression: "(name in (?, ?))", parameters: ["elvis", "costello"]});
@@ -185,6 +209,26 @@ describe("vdba.sqlite.SQLFilterFormatter", function() {
       it("format({col: {$notIn: value}})", function() {
         var res = formatter.format({name: {$notIn: ["elvis", "costello"]}});
         res.should.be.eql({expression: "(name not in (?, ?))", parameters: ["elvis", "costello"]});
+      });
+
+      it("format({col: {$nin: value}})", function() {
+        var res = formatter.format({name: {$nin: ["elvis", "costello"]}});
+        res.should.be.eql({expression: "(name not in (?, ?))", parameters: ["elvis", "costello"]});
+      });
+
+      it("format({col: {$contains: value}})", function() {
+        var res = formatter.format({name: {$contains: "elvis"}});
+        res.should.be.eql({expression: "(instr(name, '\"elvis\"') > 0)", parameters: []});
+      });
+
+      it("format({col: {$notContains: value}})", function() {
+        var res = formatter.format({name: {$notContains: "elvis"}});
+        res.should.be.eql({expression: "(name is null or instr(name, '\"elvis\"') = 0)", parameters: []});
+      });
+
+      it("format({col: {$ncontains: value}})", function() {
+        var res = formatter.format({name: {$ncontains: "elvis"}});
+        res.should.be.eql({expression: "(name is null or instr(name, '\"elvis\"') = 0)", parameters: []});
       });
     });
 

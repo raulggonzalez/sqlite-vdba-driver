@@ -128,7 +128,7 @@ module.exports = function(grunt) {
       },
 
       specific: {
-        src: ["test/init.js", "test/**/*.js"]
+        src: ["test/init.js", "../vdba-driver-validator/test/common/init.js", "test/**/*.js"]
       }
     },
 
@@ -171,7 +171,7 @@ module.exports = function(grunt) {
   //(3) define tasks
   grunt.registerTask("testSpecific", "Specific unit testing", [
     "jshint:lib",
-    "jshint:test",
+    //"jshint:test",
     "copy:node-vdba-core.js",
     "concat:driver",
     "concat:build",
@@ -182,7 +182,7 @@ module.exports = function(grunt) {
 
   grunt.registerTask("testCommon", "Common unit testing", [
     "jshint:lib",
-    "jshint:test",
+    //"jshint:test",
     "copy:node-vdba-core.js",
     "concat:driver",
     "concat:build",
