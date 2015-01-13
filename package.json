@@ -1,6 +1,6 @@
 {
   "name": "sqlite-vdba-driver",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "SQLite VDBA driver for Node.js.",
   "author": "Raúl G. González <raulggonzalezsw@outlook.com>",
   "keywords": [

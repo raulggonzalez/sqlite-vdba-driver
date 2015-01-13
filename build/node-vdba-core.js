@@ -1,4 +1,4 @@
-/*! vdba-core - 0.11.2 (2015-01-12) */
+/*! vdba-core - 0.12.0 (2015-01-13) */
 
 (function() {
 
@@ -20,6 +20,7 @@ Object.defineProperty(vdba, "util", {
   }
 });
 
+Object.defineProperty(vdba, "AggOperation", {value: AggOperation, enumerable: false});
 Object.defineProperty(vdba, "Aggregator", {value: Aggregator, enumerable: true});
 Object.defineProperty(vdba, "Column", {value: Column, enumerable: true});
 Object.defineProperty(vdba, "Combinator", {value: Combinator, enumerable: true});
@@ -28,6 +29,7 @@ Object.defineProperty(vdba, "Database", {value: Database, enumerable: true});
 Object.defineProperty(vdba, "DefinitionCache", {value: DefinitionCache, enumerable: false});
 Object.defineProperty(vdba, "Driver", {value: Driver, enumerable: true});
 Object.defineProperty(vdba, "Filter", {value: Filter, enumerable: true});
+Object.defineProperty(vdba, "GroupBy", {value: GroupBy, enumerable: true});
 Object.defineProperty(vdba, "Index", {value: Index, enumerable: true});
 Object.defineProperty(vdba, "Join", {value: Join, enumerable: true});
 Object.defineProperty(vdba, "Mapper", {value: Mapper, enumerable: true});
@@ -38,6 +40,67 @@ Object.defineProperty(vdba, "Server", {value: Server, enumerable: true});
 Object.defineProperty(vdba, "Table", {value: Table, enumerable: true});
 
 
+
+/**
+ * @classdesc An aggregation operation.
+ * @class vdba.AggOperation
+ * @private
+ *
+ * @param {String} op     The operation.
+ * @param {String} column The column.
+ * @param {String} alias  The alias.
+ * @param {Object} filter The filter.
+ */
+function AggOperation(op, column, alias, filter) {
+  /**
+   * The operation: sum, count, min, max...
+   *
+   * @name operation
+   * @type {String}
+   * @memberof vdba.AggOperation#
+   */
+  Object.defineProperty(this, "name", {value: op, enumerable: true});
+
+  /**
+   * The column name.
+   *
+   * @name column
+   * @type {String}
+   * @memberof vdba.AggOperation#
+   */
+  Object.defineProperty(this, "column", {value: column, enumerable: true});
+
+  /**
+   * The alias.
+   *
+   * @name alias
+   * @type {String}
+   * @memberof vdba.AggOperation#
+   */
+  Object.defineProperty(this, "alias", {value: alias, enumerable: true});
+
+  /**
+   * The filter for the operation result.
+   *
+   * @name filter
+   * @type {Object}
+   * @memberof vdba.AggOperation#
+   */
+  Object.defineProperty(this, "filter", {value: filter, enumerable: true});
+}
+
+/**
+ * Checks whether the operation has filter.
+ *
+ * @name hasFilter
+ * @function
+ * @memberof vdba.AggOperation#
+ *
+ * @returns {Boolean}
+ */
+AggOperation.prototype.hasFilter = function hasFilter() {
+  return !!this.filter;
+};
 
 /**
  * @classdesc An aggregator.
@@ -1633,6 +1696,94 @@ Filter.prototype.$notContains = function $notContains(row, prop, value) {
 };
 
 /**
+ * @classdesc A group-by clause.
+ * @class vdba.GroupBy
+ *
+ * @param {String|String[]} column  The grouping column(s).
+ */
+function GroupBy(columns) {
+  //(1) pre: arguments
+  if (typeof(columns) == "string") columns = [columns];
+
+  //(2) initialize
+  /**
+   * The grouping column(s).
+   *
+   * @name columns
+   * @type {String[]}
+   * @memberof vdba.GroupBy#
+   */
+  Object.defineProperty(this, "columns", {value: columns, enumerable: true});
+
+  /**
+   * The agg operations.
+   *
+   * @name aggregations
+   * @type {vdba.AggOperation[]}
+   * @memberof vdba.GroupBy#
+   */
+  Object.defineProperty(this, "aggregations", {value: [], enumerable: true});
+}
+
+/**
+ * Adds an aggregation.
+ *
+ * @name add
+ * @function
+ * @memberof vdba.GroupBy#
+ *
+ * @param {vdba.AggOperation} op  The operation.
+ */
+GroupBy.prototype.add = function add(agg) {
+  this.aggregations.push(agg);
+};
+
+/**
+ * Checks whether some aggregation has defined some filter.
+ *
+ * @name hasFilter
+ * @function
+ * @memberof vdba.GroupBy#
+ *
+ * @returns {Boolean}
+ */
+GroupBy.prototype.hasFilter = function hasFilter() {
+  var res;
+
+  //(1) check
+  res = false;
+  for (var i = 0; i < this.aggregations.length; ++i) {
+    if (this.aggregations[i].hasFilter()) {
+      res = true;
+      break;
+    }
+  }
+
+  //(2) return
+  return res;
+};
+
+/**
+ * Returns the filter.
+ *
+ * @name filter
+ * @type {Object}
+ * @memberof vdba.GroupBy#
+ */
+GroupBy.prototype.__defineGetter__("filter", function() {
+  var res = {};
+
+  //(1) build
+  for (var i = 0; i < this.aggregations.length; ++i) {
+    var agg = this.aggregations[i];
+    if (agg.hasFilter()) res[agg.alias] = agg.filter.value;
+  }
+
+  //(2) return
+  return res;
+});
+
+/**
  * @classdesc An index.
  * @class vdba.Index
  * @abstract
@@ -1883,6 +2034,16 @@ function Query() {
   Object.defineProperty(this, "filterBy", {value: {}, writable: true});
 
   /**
+   * The group by clause.
+   *
+   * @name groupBy
+   * @type {vdba.GroupBy}
+   * @memberof vdba.GroupBy#
+   * @protected
+   */
+  Object.defineProperty(this, "groupBy", {value: undefined, writable: true});
+
+  /**
    * The order by. Each field indicates the order: ASC or DESC.
    *
    * @name orderBy
@@ -1902,6 +2063,40 @@ function Query() {
    */
   Object.defineProperty(this, "joins", {value: []});
 }
+
+/**
+ * Returns the table of a specified column.
+ * Used internally for getting the table of a query column.
+ *
+ * @name getTableOf
+ * @function
+ * @memberof vdba.Query#
+ * @private
+ *
+ * @param {String} column The column name.
+ *
+ * @returns {vdba.Table}
+ */
+Query.prototype.getTableOf = function getTableOf(column) {
+  var res;
+
+  //(1) find
+  if (this.source.hasColumn(column)) {
+    res = this.source;
+  } else {
+    for (var i = 0; i < this.joins.length; ++i) {
+      var tgt = this.joins[i].target;
+
+      if (tgt.hasColumn(column)) {
+        res = tgt;
+        break;
+      }
+    }
+  }
+
+  //(2) return
+  return res;
+};
 
 /**
  * Filters the rows that comply the specified filter.
@@ -1987,7 +2182,7 @@ Query.prototype.hasLimit = function hasLimit() {
  * @param {String|String[]|Object} columns  The ordering column(s).
  * @param {Function} [callback]             The function to call: fn(error, result).
  *
- * @returns {vdba.Query}  The same query to chain if needed.
+ * @returns {vdba.Query}  The same query for chaining if needed.
  */
 Query.prototype.sort = function sort(columns, callback) {
   var cols = {};
@@ -2028,6 +2223,314 @@ Query.prototype.sort = function sort(columns, callback) {
  */
 Query.prototype.hasOrderBy = function hasOrderBy() {
   return (this.orderBy && Object.keys(this.orderBy).length > 0);
+};
+
+/**
+ * Groups by the specified column(s).
+ *
+ * @name group
+ * @function
+ * @memberof vdba.Query#
+ *
+ * @param {String|String[]} columns The grouping column(s).
+ * @param {Function} [callback]     The function to call: fn(error, result).
+ *
+ * @returns {vdba.Query}  The same query for chaining if needed.
+ */
+Query.prototype.group = function group(columns, callback) {
+  //(1) pre: arguments
+  if (!columns) throw new Error("Grouping column name(s) expected.");
+
+  //(2) configure query
+  this.groupBy = new GroupBy(columns);
+
+  //(3) run if needed
+  if (callback) this.find(callback);
+
+  //(4) return
+  return this;
+};
+
+/**
+ * Checks whether the query has group-by.
+ *
+ * @name gasGroupBy
+ * @function
+ * @memberof vdba.Query#
+ *
+ * @returns {Boolean}
+ */
+Query.prototype.hasGroupBy = function hasGroupBy() {
+  return !!this.groupBy;
+};
+
+/**
+ * Sums the specified column.
+ *
+ * @name sum
+ * @function
+ * @memberof vdba.Query#
+ *
+ * @param {String} column       The column.
+ * @param {String} [alias]      The result alias.
+ * @param {Object} [filter]     The filter. Example: {value: {$gt: 5}}.
+ * @param {Function} [callback] The function to call: fn(error, result).
+ *
+ * @returns {vdba.Query}  The same query for chaining if needed.
+ */
+Query.prototype.sum = function sum(column, alias, filter, callback) {
+  //(1) pre: arguments
+  if (arguments.length == 2) {
+    if (arguments[1] instanceof Function) {
+      callback = arguments[1];
+      alias = filter = undefined;
+    } else if (typeof(arguments[1]) == "object") {
+      filter = arguments[1];
+      alias = callback = undefined;
+    }
+  } else if (arguments.length == 3) {
+    if (typeof(arguments[1]) == "string") {
+      if (arguments[2] instanceof Function) {
+        callback = arguments[2];
+        filter = undefined;
+      }
+    } else if (typeof(arguments[1]) == "object") {
+      callback = arguments[2];
+      filter = arguments[1];
+      alias = undefined;
+    }
+  }
+
+  if (!this.hasGroupBy()) throw new Error("No grouping column specified.");
+  if (!column) throw new Error("Column name expected.");
+  if (!alias) alias = "sum";
+
+  //(2) configure query
+  this.groupBy.add(new AggOperation("sum", column, alias, filter));
+
+  //(3) run query if needed
+  if (callback) this.find(callback);
+
+  //(4) return
+  return this;
+};
+
+/**
+ * Counts the grouped rows.
+ *
+ * @name count
+ * @function
+ * @memberof vdba.Query#
+ *
+ * @param {String} [column]     The column.
+ * @param {String} [alias]      The alias.
+ * @param {Object} [filter]     The filter.
+ * @param {Function} [callback] The function to call: fn(error, result).
+ *
+ * @returns {vdba.Query}  The same query for chaining if needed.
+ */
+Query.prototype.count = function count(column, alias, filter, callback) {
+  //(1) pre: arguments
+  if (arguments.length == 1) {
+    if (arguments[0] instanceof Function) {
+      callback = arguments[0];
+      column = alias = filter = undefined;
+    } else if (typeof(arguments[0]) == "object") {
+      filter = arguments[0];
+      column = alias = callback = undefined;
+    }
+  } else if (arguments.length == 2) {
+    if (typeof(arguments[0]) == "object") {
+      filter = arguments[0];
+      callback = arguments[1];
+      column =  alias = undefined;
+    } else {
+      if (arguments[1] instanceof Function) {
+        callback = arguments[1];
+        alias = filter = undefined;
+      } else if (typeof(arguments[1]) == "object") {
+        filter = arguments[1];
+        alias = callback = undefined;
+      }
+    }
+  } else if (arguments.length == 3) {
+    if (typeof(arguments[1]) == "string") {
+      if (arguments[2] instanceof Function) {
+        callback = arguments[2];
+        filter = undefined;
+      }
+    } else if (typeof(arguments[1]) == "object") {
+      callback = arguments[2];
+      filter = arguments[1];
+      alias = undefined;
+    }
+  }
+
+  if (!this.hasGroupBy()) throw new Error("No grouping column specified.");
+  if (!column) column = "*";
+  if (!alias) alias = "count";
+
+  //(2) configure query
+  this.groupBy.add(new AggOperation("count", column, alias, filter));
+
+  //(3) run query if needed
+  if (callback) this.find(callback);
+
+  //(4) return
+  return this;
+};
+
+/**
+ * Selects the maximum value of each group.
+ *
+ * @name max
+ * @function
+ * @memberof vdba.Query#
+ *
+ * @param {String} column       The column name.
+ * @param {String} [alias]      The alias.
+ * @param {Object} [filter]     The filter.
+ * @param {Function} [callback] The function to call: fn(error, result).
+ *
+ * @returns {vdba.Query}  The same query for chaining if needed.
+ */
+Query.prototype.max = function max(column, alias, filter, callback) {
+  //(1) pre: arguments
+  if (arguments.length == 2) {
+    if (arguments[1] instanceof Function) {
+      callback = arguments[1];
+      alias = filter = undefined;
+    } else if (typeof(arguments[1]) == "object") {
+      filter = arguments[1];
+      alias = callback = undefined;
+    }
+  } else if (arguments.length == 3) {
+    if (typeof(arguments[1]) == "string") {
+      if (arguments[2] instanceof Function) {
+        callback = arguments[2];
+        filter = undefined;
+      }
+    } else if (typeof(arguments[1]) == "object") {
+      callback = arguments[2];
+      filter = arguments[1];
+      alias = undefined;
+    }
+  }
+
+  if (!this.hasGroupBy()) throw new Error("No grouping column specified.");
+  if (!column) throw new Error("Column name expected.");
+  if (!alias) alias = "max";
+
+  //(2) configure query
+  this.groupBy.add(new AggOperation("max", column, alias, filter));
+
+  //(3) run if needed
+  if (callback) this.find(callback);
+
+  //(4) return
+  return this;
+};
+
+/**
+ * Selects the minimum value of each group.
+ *
+ * @name min
+ * @function
+ * @memberof vdba.Query#
+ *
+ * @param {String} column       The column name.
+ * @param {String} [alias]      The alias.
+ * @param {Object} [filter]     The filter.
+ * @param {Function} [callback] The function to call: fn(error, result).
+ *
+ * @returns {vdba.Query}  The same query for chaining if needed.
+ */
+Query.prototype.min = function min(column, alias, filter, callback) {
+  //(1) pre: arguments
+  if (arguments.length == 2) {
+    if (arguments[1] instanceof Function) {
+      callback = arguments[1];
+      alias = filter = undefined;
+    } else if (typeof(arguments[1]) == "object") {
+      filter = arguments[1];
+      alias = callback = undefined;
+    }
+  } else if (arguments.length == 3) {
+    if (typeof(arguments[1]) == "string") {
+      if (arguments[2] instanceof Function) {
+        callback = arguments[2];
+        filter = undefined;
+      }
+    } else if (typeof(arguments[1]) == "object") {
+      callback = arguments[2];
+      filter = arguments[1];
+      alias = undefined;
+    }
+  }
+
+  if (!this.hasGroupBy()) throw new Error("No grouping column specified.");
+  if (!column) throw new Error("Column name expected.");
+  if (!alias) alias = "min";
+
+  //(2) configure query
+  this.groupBy.add(new AggOperation("min", column, alias, filter));
+
+  //(3) run if needed
+  if (callback) this.find(callback);
+
+  //(4) return
+  return this;
+};
+
+/**
+ * Performs the average of each group.
+ *
+ * @name avg
+ * @function
+ * @memberof vdba.Query#
+ *
+ * @param {String} column       The column name.
+ * @param {String} [alias]      The alias.
+ * @param {Object} [filter]     The filter.
+ * @param {Function} [callback] The function to call: fn(error, result).
+ *
+ * @returns {vdba.Query}  The same query for chaining if needed.
+ */
+Query.prototype.avg = function avg(column, alias, filter, callback) {
+  //(1) pre: arguments
+  if (arguments.length == 2) {
+    if (arguments[1] instanceof Function) {
+      callback = arguments[1];
+      alias = filter = undefined;
+    } else if (typeof(arguments[1]) == "object") {
+      filter = arguments[1];
+      alias = callback = undefined;
+    }
+  } else if (arguments.length == 3) {
+    if (typeof(arguments[1]) == "string") {
+      if (arguments[2] instanceof Function) {
+        callback = arguments[2];
+        filter = undefined;
+      }
+    } else if (typeof(arguments[1]) == "object") {
+      callback = arguments[2];
+      filter = arguments[1];
+      alias = undefined;
+    }
+  }
+
+  if (!this.hasGroupBy()) throw new Error("No grouping column specified.");
+  if (!column) throw new Error("Column name expected.");
+  if (!alias) alias = "avg";
+
+  //(2) configure query
+  this.groupBy.add(new AggOperation("avg", column, alias, filter));
+
+  //(3) run if needed
+  if (callback) this.find(callback);
+
+  //(4) return
+  return this;
 };
 
 /**
@@ -2303,6 +2806,15 @@ Query.prototype.joinom = function joinoo(target, col1, col2, callback) {
 
   //(4) return
   return this;
+};
+
+/**
+ * Checks whether this is an aggregate query.
+ *
+ * @returns {Boolean}
+ */
+Query.prototype.isAggregate = function isAggregate() {
+  return !!this.groupBy;
 };
 
 /**
@@ -2712,6 +3224,21 @@ Table.prototype.__defineGetter__("columnNames", function() {
 });
 
 /**
+ * Checks whether the table has the specified column.
+ *
+ * @name hasColumn
+ * @function
+ * @memberof vdba.Table#
+ *
+ * @param {String} name The column name.
+ *
+ * @returns {Boolean}
+ */
+Table.prototype.hasColumn = function hasColumn(name) {
+  return this.columns.hasOwnProperty(name);
+};
+
+/**
  * The database.
  *
  * @name database
@@ -2883,6 +3410,23 @@ Table.prototype.query = function query() {
 };
 
 /**
+ * Similar to this.query().group(columns, callback).
+ *
+ * @name group
+ * @function
+ * @memberof vdba.Table#
+ *
+ * @param {String|String[]} columns The grouping column(s).
+ * @param {Function} [callback]     The function to call: fn(error, result).
+ *
+ * @returns {vdba.Query}  The query.
+ */
+Table.prototype.group = function group() {
+  var q = this.query();
+  return q.group.apply(q, Array.prototype.slice.call(arguments));
+};
+
+/**
  * Similar to this.query().limit(count, start, callback).
  *
  * @name limit
@@ -2895,7 +3439,7 @@ Table.prototype.query = function query() {
  *
  * @returns {vdba.Query}
  */
-Table.prototype.limit = function limit(count, start, callback) {
+Table.prototype.limit = function limit() {
   var q = this.query();
   return q.limit.apply(q, Array.prototype.slice.call(arguments));
 };
@@ -2912,7 +3456,7 @@ Table.prototype.limit = function limit(count, start, callback) {
  *
  * @returns {vdba.Query}
  */
-Table.prototype.filter = function filter(where, callback) {
+Table.prototype.filter = function filter() {
   var q = this.query();
   return q.filter.apply(q, Array.prototype.slice.call(arguments));
 };
