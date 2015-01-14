@@ -1,4 +1,4 @@
-/*! vdba-core - 0.12.0 (2015-01-13) */
+/*! vdba-core - 0.13.0 (2015-01-14) */
 
 (function() {
 
@@ -220,37 +220,113 @@ function Column(name, type, options) {
 }
 
 /**
- * Indicates if the column is nullable.
+ * Indicates if the column is required, that is, it doesn't accept a null value.
+ *
+ * @name required
+ * @type {Boolean}
+ * @memberof vdba.Column#
+ */
+Column.prototype.__defineGetter__("required", function() {
+  return (this.id ? true : !!this.options.required);
+});
+
+/**
+ * Alias of !required.
  *
  * @name nullable
  * @type {Boolean}
  * @memberof vdba.Column#
  */
 Column.prototype.__defineGetter__("nullable", function() {
-  return !!this.options.nullable;
+  return !this.required;
 });
 
 /**
- * Indicates if the column is primary key.
+ * Alias of !required.
+ *
+ * @name optional
+ * @type {Boolean}
+ * @memberof vdba.Column#
+ */
+Column.prototype.__defineGetter__("optional", function() {
+  return !this.required;
+});
+
+/**
+ * Indicates if the column is the primary key.
+ *
+ * @name id
+ * @type {Boolean}
+ * @memberof vdba.Column#
+ */
+Column.prototype.__defineGetter__("id", function() {
+  return !!this.options.id;
+});
+
+/**
+ * Alias of id.
  *
  * @name primaryKey
  * @type {Boolean}
  * @memberof vdba.Column#
  */
 Column.prototype.__defineGetter__("primaryKey", function() {
-  return !!this.options.primaryKey;
+  return this.id;
 });
 
 /**
- * Alias of primaryKey.
+ * Alias of id.
  *
  * @name pk
  * @type {Boolean}
  * @memberof vdba.Column#
  */
 Column.prototype.__defineGetter__("pk", function() {
-  return this.primaryKey;
+  return this.id;
 });
+
+/**
+ * Indicates if the column is unique.
+ *
+ * @name unique
+ * @type {Boolean}
+ * @memberof vdba.Column#
+ */
+Column.prototype.__defineGetter__("unique", function() {
+  return (this.id ? true : !!this.options.unique);
+});
+
+/**
+ * Checks whether the columns complies the specified definition.
+ *
+ * @name checkDefinition
+ * @function
+ * @memberof vdba.Column#
+ *
+ * @param {String|Object} def The definition. If string, this indicates the type.
+ *
+ * @returns {Boolean}
+ */
+Column.prototype.checkDefinition = function checkDefinition(def) {
+  var res;
+
+  //(1) pre: arguments
+  if (!def) throw new Error("Column definition to check expected.");
+  if (typeof(def) != "object") def = {type: def};
+
+  //(1) check
+  res = true;
+
+  for (var i = 0, props = Object.keys(def); i < props.length && res; ++i) {
+    var prop = props[i];
+
+    if (["id", "required", "type", "unique"].indexOf(prop) < 0) res = false;
+    else res = (this[prop] == def[prop]);
+  }
+
+  //(2) return
+  return res;
+};
 
 /**
  * Checks whether the column stores a set.
@@ -778,7 +854,7 @@ Database.prototype.hasTable = function hasTable(schema, table, columns, callback
     if (error) {
       callback(error);
     } else {
-      if (tbl) callback(undefined, (columns ? tbl.checkSchema(columns) : true));
+      if (tbl) callback(undefined, (columns ? tbl.checkDefinition(columns) : true));
       else callback(undefined, false);
     }
   });
@@ -3296,39 +3372,27 @@ Table.prototype.__defineGetter__("fqn", function() {
 /**
  * Checks whether the table has the specified columns.
  *
- * @name checkSchema
+ * @name checkDefinition
  * @function
  * @memberof vdba.Table#
  *
  * @param {Object} columns  The columns to check.
  * @returns {Boolean}
  */
-Table.prototype.checkSchema = function checkSchema(columns) {
+Table.prototype.checkDefinition = function checkDefinition(columns) {
   var res;
 
   //(1) pre: arguments
-  if (!columns) columns = {};
+  if (!columns) throw new Error("Column(s) to check expected.");
 
   //(2) check
   res = true;
 
-  for (var i = 0, colNames = Object.keys(columns); i < colNames.length; ++i) {
+  for (var i = 0, colNames = Object.keys(columns); i < colNames.length && res; ++i) {
     var name = colNames[i];
-    var chkCol = columns[name];
-    var tblCol = this.columns[name];
+    var col = this.columns[name];
 
-    if (typeof(chkCol) != "object") chkCol = {type: chkCol};
-
-    if (chkCol && tblCol) {
-      if (chkCol.hasOwnProperty("type") && chkCol.type != tblCol.type) res = false;
-      if (chkCol.hasOwnProperty("nullable") && chkCol.nullable != tblCol.nullable) res = false;
-      if (chkCol.hasOwnProperty("primaryKey") && chkCol.primaryKey != tblCol.primaryKey) res = false;
-      if (chkCol.hasOwnProperty("pk") && chkCol.pk != tblCol.primaryKey) res = false;
-    } else {
-      res = false;
-    }
-
-    if (!res) break;
+    res = (col ? col.checkDefinition(columns[name]) : false);
   }
 
   //(3) return result
